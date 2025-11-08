@@ -110,7 +110,7 @@ cast send 0x139d2a7a0881e16332d7D1F8DB383A4507E1Ea7A \
 
 **Replace:**
 - `YOUR_OLD_PRIVATE_KEY` with your existing wallet's private key
-- `YOUR_ETH_RPC_URL` with your Ethereum RPC endpoint (e.g., `http://159.195.21.49:8545`)
+- `YOUR_ETH_RPC_URL` with your Ethereum RPC endpoint
 
 ## Step 6: Verify Token Allowance
 
