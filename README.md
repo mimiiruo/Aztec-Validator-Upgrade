@@ -2,7 +2,42 @@
 
 This guide walks you through setting up an Aztec validator node on the testnet using Docker.
 
-## Prerequisites
+## Quick Start: Automated Installation (Recommended for New Nodes)
+
+If you're setting up a brand new validator node, you can use the automated Docker installer:
+
+```bash
+rm -rf autoinstall-aztec-docker.sh && \
+wget https://raw.githubusercontent.com/ezlabsnodes/autoinstall/main/autoinstall-aztec-docker.sh && \
+chmod +x autoinstall-aztec-docker.sh && \
+sudo ./autoinstall-aztec-docker.sh
+```
+
+The automated installer will prompt you for:
+
+- **ETHEREUM_RPC_URL**: Your L1 Execution Layer RPC endpoint
+- **CONSENSUS_BEACON_URL**: Your L1 Consensus Layer Beacon RPC endpoint
+- **VALIDATOR_PRIVATE_KEYS**: Your validator's private key (comma-separated if multiple)
+- **COINBASE**: Your wallet address (Ethereum address for rewards)
+
+**When to use the automated installer:**
+- Fresh VPS setup with no existing Aztec installation
+- Migrating to a new server
+- Quick deployment without manual configuration
+
+**When to use the manual process below:**
+- Upgrading an existing validator node
+- Migrating from an old version (e.g., 2.0.4 to 2.1.2)
+- Custom configuration requirements
+- Troubleshooting specific issues
+
+---
+
+## Manual Setup Process
+
+If you need to upgrade an existing node or prefer manual control, follow the steps below.
+
+### Prerequisites
 
 - A Linux server with Docker and Docker Compose installed
 - Root access or sudo privileges
@@ -193,5 +228,3 @@ docker compose logs -f
 ```
 
 Press `Ctrl+C` to exit the logs view.
-
-Check the status of your containers:
