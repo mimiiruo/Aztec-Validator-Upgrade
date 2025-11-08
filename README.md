@@ -133,7 +133,7 @@ cast call 0x139d2a7a0881e16332d7D1F8DB383A4507E1Ea7A \
 Create a new set of validator keys:
 
 ```bash
-aztec validator keys new \
+aztec validator-keys new \
   --fee-recipient 0x0000000000000000000000000000000000000000000000000000000000000000 \
   --data-dir ~/.aztec/keystore \
   --file key1.json
