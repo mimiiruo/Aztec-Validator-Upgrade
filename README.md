@@ -1,62 +1,58 @@
-# Aztec Sequencer Node Update Guide - Version 2.1.2
+# Aztec Validator Setup Guide v2.1.2
 
-A comprehensive guide to update your Aztec sequencer node to version 2.1.2.
-
-## Overview
-
-This guide will walk you through updating your Aztec sequencer node from a previous version to version 2.1.2. The process involves generating new validator keys, registering them on-chain, and updating your node configuration.
+This guide walks you through setting up an Aztec validator node on the testnet using Docker.
 
 ## Prerequisites
 
-Before starting, ensure you have:
+- A Linux server with Docker and Docker Compose installed
+- Root access or sudo privileges
+- An existing Ethereum wallet with testnet tokens
+- RPC endpoint access (both Aztec and Ethereum)
 
-- Root access to your server
-- Your old sequencer private key
-- Ethereum Sepolia RPC URL
-- At least 1 Sepolia ETH for gas fees
-- Basic familiarity with command line operations
+## Step 1: Clean Up Existing Installation
 
-**Estimated Time:** 30-45 minutes (plus sync time)
-
-## Table of Contents
-
-1. [Stop and Clean Old Node](#step-1-stop-and-clean-old-node)
-2. [Update Aztec CLI](#step-2-update-aztec-to-212)
-3. [Install Foundry](#step-3-install-foundry)
-4. [Approve Stake Token](#step-4-approve-stake-token)
-5. [Generate New Validator Keys](#step-5-generate-new-validator-keys)
-6. [Extract and Save Keys](#step-6-extract-and-save-keys)
-7. [Register Validator](#step-7-register-validator)
-8. [Update Docker Compose](#step-8-update-docker-compose)
-9. [Update Environment Variables](#step-9-update-environment-variables)
-10. [Start Updated Node](#step-10-start-updated-node)
-
----
-
-## Step 1: Stop and Clean Old Node
-
-First, stop your existing sequencer node and clean the old data directory:
+Navigate to your Aztec directory and reset the environment:
 
 ```bash
-docker stop aztec-sequencer && docker rm aztec-sequencer
-sudo rm -rf /root/.aztec/testnet/data/
+cd ~/aztec
+docker compose down
+rm -rf /root/.aztec/testnet/data
 ```
 
----
+## Step 2: Update Docker Compose Configuration
 
-## Step 2: Update Aztec to 2.1.2
+Update the Aztec version and network settings:
 
-Update the Aztec CLI to version 2.1.2:
+```bash
+sed -i 's|^ *image: aztecprotocol/aztec:.*|    image: aztecprotocol/aztec:2.1.2|' docker-compose.yml
+sed -i 's|--network alpha-testnet|--network testnet|g' docker-compose.yml
+docker compose pull
+```
+
+## Step 3: Install Aztec CLI Tools
+
+Install the Aztec toolchain:
+
+```bash
+bash -i <(curl -s https://install.aztec.network)
+```
+
+Add Aztec to your PATH:
+
+```bash
+echo 'export PATH=$PATH:/root/.aztec/bin' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Verify installation and set version:
 
 ```bash
 aztec-up -v 2.1.2
 ```
 
----
+## Step 4: Install Foundry (Ethereum Development Tools)
 
-## Step 3: Install Foundry
-
-Install Foundry (required for interacting with Ethereum contracts):
+Install Foundry for interacting with Ethereum contracts:
 
 ```bash
 curl -L https://foundry.paradigm.xyz | bash
@@ -64,194 +60,138 @@ source /root/.bashrc
 foundryup
 ```
 
----
+## Step 5: Approve Token Allowance
 
-## Step 4: Approve Stake Token
-
-Approve the rollup contract to spend your stake tokens:
+Approve the Rollup contract to spend tokens from your existing wallet:
 
 ```bash
 cast send 0x139d2a7a0881e16332d7D1F8DB383A4507E1Ea7A \
   "approve(address,uint256)" \
   0xebd99ff0ff6677205509ae73f93d0ca52ac85d67 \
   200000ether \
-  --private-key "YOUR_OLD_SEQUENCER_PRIVATE_KEY" \
+  --private-key YOUR_OLD_PRIVATE_KEY \
   --rpc-url YOUR_ETH_RPC_URL
 ```
 
 **Replace:**
-- `YOUR_OLD_SEQUENCER_PRIVATE_KEY` with your old sequencer private key
-- `YOUR_ETH_RPC_URL` with your Ethereum Sepolia RPC endpoint
+- `YOUR_OLD_PRIVATE_KEY` with your existing wallet's private key
+- `YOUR_ETH_RPC_URL` with your Ethereum RPC endpoint (e.g., `http://159.195.21.49:8545`)
 
----
+## Step 6: Verify Token Allowance
 
-## Step 5: Generate New Validator Keys
-
-Generate new validator keys for version 2.1.2:
+Confirm the approval was successful:
 
 ```bash
-aztec validator-keys new \
+cast call 0x139d2a7a0881e16332d7D1F8DB383A4507E1Ea7A \
+  "allowance(address,address)(uint256)" \
+  YOUR_OLD_WALLET_ADDRESS \
+  0xebd99ff0ff6677205509ae73f93d0ca52ac85d67 \
+  --rpc-url YOUR_ETH_RPC_URL
+```
+
+**Replace:**
+- `YOUR_OLD_WALLET_ADDRESS` with your Ethereum address
+- `YOUR_ETH_RPC_URL` with your RPC endpoint
+
+## Step 7: Generate New Validator Keys
+
+Create a new set of validator keys:
+
+```bash
+aztec validator keys new \
   --fee-recipient 0x0000000000000000000000000000000000000000000000000000000000000000 \
   --data-dir ~/.aztec/keystore \
   --file key1.json
 ```
 
----
+## Step 8: Extract and Save Your Keys
 
-## Step 6: Extract and Save Keys
-
-Extract and display your new validator keys:
+Display your newly generated keys:
 
 ```bash
-ETH_PK=$(jq -r '.validators[0].attester.eth' ~/.aztec/keystore/key1.json); \
-BLS_KEY=$(jq -r '.validators[0].attester.bls' ~/.aztec/keystore/key1.json); \
-ETH_ADDR=$(cast wallet address --private-key "$ETH_PK"); \
-printf "================================================\n"; \
-printf "NEW VALIDATOR KEYS - SAVE THESE SECURELY!\n"; \
-printf "================================================\n"; \
-printf "ETH Address     : %s\n" "$ETH_ADDR"; \
-printf "ETH Private Key : %s\n" "$ETH_PK"; \
-printf "BLS Key         : %s\n" "$BLS_KEY"; \
+ETH_PK=$(jq -r '.validators[0].attester.eth' ~/.aztec/keystore/key1.json)
+BLS_KEY=$(jq -r '.validators[0].attester.bls' ~/.aztec/keystore/key1.json)
+ETH_ADDR=$(cast wallet address --private-key "$ETH_PK")
+
+printf "================================================\n"
+printf "NEW VALIDATOR KEYS - SAVE THESE SECURELY!\n"
+printf "================================================\n"
+printf "ETH Address     : %s\n" "$ETH_ADDR"
+printf "ETH Private Key : %s\n" "$ETH_PK"
+printf "BLS Key         : %s\n" "$BLS_KEY"
 printf "================================================\n"
 ```
 
-### ⚠️ CRITICAL: Save Your Keys
+**⚠️ IMPORTANT:** Save these keys securely! You'll need them for the next step.
 
-**You must save all three values securely:**
-- ETH Address
-- ETH Private Key
-- BLS Key
+## Step 9: Register Validator on L1
 
-**Fund the ETH Address with at least 1 Sepolia ETH before continuing.**
-
----
-
-## Step 7: Register Validator
-
-Register your new validator on the L1 rollup contract:
+Register your new validator keys with the Aztec rollup contract:
 
 ```bash
 aztec add-l1-validator \
-  --l1-rpc-urls "YOUR_ETH_RPC_URL" \
+  --l1-rpc-urls YOUR_ETH_RPC_URL \
   --network testnet \
-  --private-key "YOUR_OLD_SEQUENCER_PRIVATE_KEY" \
-  --attester "YOUR_NEW_ETH_ADDRESS" \
-  --withdrawer "YOUR_NEW_ETH_ADDRESS" \
-  --bls-secret-key "YOUR_BLS_KEY" \
+  --private-key YOUR_OLD_PRIVATE_KEY \
+  --attester YOUR_NEW_ETH_ADDRESS \
+  --withdrawer YOUR_NEW_ETH_ADDRESS \
+  --bls-secret-key YOUR_BLS_SECRET_KEY \
   --rollup 0xebd99ff0ff6677205509ae73f93d0ca52ac85d67
 ```
 
-**Replace all placeholder values:**
-- `YOUR_ETH_RPC_URL` with your RPC endpoint
-- `YOUR_OLD_SEQUENCER_PRIVATE_KEY` with your old sequencer key
-- `YOUR_NEW_ETH_ADDRESS` with the ETH Address from Step 6
-- `YOUR_BLS_KEY` with the BLS Key from Step 6
+**Replace:**
+- `YOUR_ETH_RPC_URL` with your Ethereum RPC endpoint
+- `YOUR_OLD_PRIVATE_KEY` with your existing wallet's private key (used to pay gas)
+- `YOUR_NEW_ETH_ADDRESS` with the ETH Address from Step 8
+- `YOUR_BLS_SECRET_KEY` with the BLS Key from Step 8
 
----
+## Step 10: Update Docker Compose for Full Sync
 
-## Step 8: Update Docker Compose
-
-Update your Docker Compose configuration to use version 2.1.2 and full sync mode:
+Modify the Docker Compose configuration to use full sync mode:
 
 ```bash
-cd ~/aztec && \
-sed -i 's|aztecprotocol/aztec:2.0.4|aztecprotocol/aztec:2.1.2|g' docker-compose.yml && \
+cd ~/aztec
+sed -i 's|aztecprotocol/aztec:2.0.4|aztecprotocol/aztec:2.1.2|g' docker-compose.yml
 sed -i 's|--snapshots-url https://snapshots.aztec.graphops.xyz/files|--sync-mode full|' docker-compose.yml
 ```
 
----
+## Step 11: Update Environment Variables
 
-## Step 9: Update Environment Variables
-
-Update your environment configuration with the new validator keys:
+Configure your validator credentials in the `.env` file:
 
 ```bash
-cd ~/aztec && \
-cp .env .env.backup && \
-ETH_PK=$(jq -r '.validators[0].attester.eth' ~/.aztec/keystore/key1.json) && \
-ETH_ADDR=$(cast wallet address --private-key "$ETH_PK") && \
-sed -i "s|^VALIDATOR_PRIVATE_KEYS=.*|VALIDATOR_PRIVATE_KEYS=$ETH_PK|" .env && \
-sed -i "s|^COINBASE=.*|COINBASE=$ETH_ADDR|" .env && \
-echo "✅ .env updated!" && cat .env
+cd ~/aztec
+cp .env .env.backup
+
+ETH_PK=$(jq -r '.validators[0].attester.eth' ~/.aztec/keystore/key1.json)
+ETH_ADDR=$(cast wallet address --private-key "$ETH_PK")
+
+sed -i "s|^VALIDATOR_PRIVATE_KEYS=.*|VALIDATOR_PRIVATE_KEYS=$ETH_PK|" .env
+sed -i "s|^COINBASE=.*|COINBASE=$ETH_ADDR|" .env
+
+echo "✅ .env updated!"
+cat .env
 ```
 
-This command automatically:
-- Creates a backup of your existing `.env` file
-- Updates the `VALIDATOR_PRIVATE_KEYS` variable
-- Updates the `COINBASE` variable
-- Displays the updated configuration
+This backs up your existing `.env` file and updates it with your new validator credentials.
 
----
+## Step 12: Start Your Validator Node
 
-## Step 10: Start Updated Node
-
-Start your updated node:
+Launch the validator node:
 
 ```bash
-cd ~/aztec && docker compose up -d
+cd ~/aztec
+docker compose up -d
 ```
 
-### View Logs
+## Step 13: Monitor Your Validator
 
-Monitor your node's logs to ensure it's running correctly:
+Check the logs to ensure everything is running correctly:
 
 ```bash
-docker logs -f aztec-sequencer
+docker compose logs -f
 ```
 
-Press `Ctrl+C` to exit the log viewer.
+Press `Ctrl+C` to exit the logs view.
 
----
-
-## Verification
-
-Your node is now running version 2.1.2 and will begin syncing with the network. You can verify the update by checking:
-
-1. The Docker container is running: `docker ps`
-2. The logs show no errors: `docker logs aztec-sequencer`
-3. The node is syncing blocks
-
----
-
-## Troubleshooting
-
-### Node Won't Start
-
-- Check Docker logs for error messages
-- Verify all environment variables are set correctly
-- Ensure your ETH address has sufficient Sepolia ETH
-
-### Sync Issues
-
-- Verify your RPC endpoint is working
-- Check network connectivity
-- Ensure you're using full sync mode
-
-### Key Generation Errors
-
-- Verify `jq` is installed: `sudo apt-get install jq`
-- Check that `key1.json` exists in `~/.aztec/keystore/`
-
----
-
-## Important Notes
-
-- **Keep your validator keys secure** - never share them publicly
-- **Backup your `.env` file** - a backup is automatically created as `.env.backup`
-- **Monitor your node** - regularly check logs for any issues
-- **Maintain sufficient ETH** - ensure your validator address always has enough Sepolia ETH for gas
-
----
-
-## Support
-
-For additional help:
-- [Aztec Documentation](https://docs.aztec.network/)
-- [Aztec Discord](https://discord.gg/aztec)
-- [GitHub Issues](https://github.com/AztecProtocol/aztec-packages/issues)
-
----
-
-## License
-
-This guide is provided as-is for informational purposes. Always refer to official Aztec documentation for the most up-to-date information.
+Check the status of your containers:
